@@ -1,8 +1,12 @@
 package programadorwho.msavaliadorcredito.applicatiion;
 
+import feign.FeignException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import programadorwho.msavaliadorcredito.applicatiion.exception.DadosClientNotFoundException;
+import programadorwho.msavaliadorcredito.applicatiion.exception.ErrorCommMicroServiceException;
 import programadorwho.msavaliadorcredito.domain.model.CartaoCliente;
 import programadorwho.msavaliadorcredito.domain.model.DadosCliente;
 import programadorwho.msavaliadorcredito.domain.model.SituacaoCliente;
@@ -18,15 +22,25 @@ public class AvaliadorCreditoService {
     private final ClienteResourceClient clienteResourceClient;
     private final CartoesResourceClient cartoesResourceClient;
 
-    public SituacaoCliente obtersituacaoCliente(String cpf) {
+    public SituacaoCliente obtersituacaoCliente(String cpf) throws DadosClientNotFoundException,
+            ErrorCommMicroServiceException {
 
-        ResponseEntity<DadosCliente> dadosClienteResponseEntity = clienteResourceClient.datasClient(cpf);
-        ResponseEntity<List<CartaoCliente>> cartoesResponseEntity = cartoesResourceClient.getCardByClient(cpf);
+        try {
+            ResponseEntity<DadosCliente> dadosClienteResponseEntity = clienteResourceClient.datasClient(cpf);
+            ResponseEntity<List<CartaoCliente>> cartoesResponseEntity = cartoesResourceClient.getCardByClient(cpf);
 
-        return SituacaoCliente
-                .builder()
-                .cliente(dadosClienteResponseEntity.getBody())
-                .cartoes(cartoesResponseEntity.getBody())
-                .build();
+            return SituacaoCliente
+                    .builder()
+                    .cliente(dadosClienteResponseEntity.getBody())
+                    .cartoes(cartoesResponseEntity.getBody())
+                    .build();
+
+        } catch (FeignException.FeignClientException e) {
+            int status = e.status();
+            if (HttpStatus.NOT_FOUND.value() == status) {
+                throw new DadosClientNotFoundException();
+            }
+            throw new ErrorCommMicroServiceException(e.getMessage(), status);
+        }
     }
 }
